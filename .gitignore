@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache
+build/
+
+.idea
+.vscode
+.history
+*.vsix
+.VSCodeCounter
