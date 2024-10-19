@@ -40,7 +40,7 @@ After restarting the server, you should be seeing a log message similar to `Webs
 This part is optional, but required if your server runs under https/ssl. It will *require* you to have a valid domain/subdomain *and* ssl certificate.  
 
 1. Move your ssl certificate file to somewhere inside the houdini folder.
-2. Set the path to your ssl certificate file in `__init__.py` (line 36)
+2. Set the path to your ssl files in `__init__.py` (line 36 and 41)
 3. Restart the server
 
 Here is an example:
@@ -50,4 +50,9 @@ Here is an example:
 def certificate_path(self) -> Optional[str]:
     """The path to the certificate file (optional)"""
     return "./path/to/your/cert.pem"
+
+@property
+def key_path(self) -> Optional[str]:
+    """The path to the key file (optional)"""
+    return "./path/to/your/key.pem"
 ```

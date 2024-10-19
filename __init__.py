@@ -36,13 +36,18 @@ class HoudiniWebsockets(IPlugin):
         ...
 
     @property
+    def key_path(self) -> Optional[str]:
+        """The path to the key file (optional)"""
+        ...
+
+    @property
     def ssl_context(self) -> Optional[ssl.SSLContext]:
         """The SSL context for the websocket server."""
-        if not self.certificate_path:
+        if not self.certificate_path or not self.key_path:
             return None
-        
+
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(self.certificate_path)
+        ssl_context.load_cert_chain(self.certificate_path, self.key_path)
         return ssl_context
 
     def __init__(self, server) -> None:
