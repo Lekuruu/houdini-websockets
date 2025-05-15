@@ -40,14 +40,15 @@ class WebsocketReader:
         self.stack = b''
 
     async def readuntil(self, separator: bytes) -> bytes:
-        if separator in self.stack:
-            index = self.stack.index(separator)
-            data = self.stack[:index + len(separator)]
-            self.stack = self.stack[index + len(separator):]
-            return data
+        while True:
+            if separator in self.stack:
+                index = self.stack.index(separator)
+                data = self.stack[:index + len(separator)]
+                self.stack = self.stack[index + len(separator):]
+                return data
 
-        try:
-            self.stack += await self.websocket.recv()
-            return await self.readuntil(separator)
-        except ConnectionClosed:
-            raise ConnectionResetError()
+            try:
+                chunk = await self.websocket.recv()
+                self.stack += chunk
+            except ConnectionClosed:
+                raise ConnectionResetError()
