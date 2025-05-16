@@ -28,7 +28,7 @@ class WebsocketWriter:
         asyncio.create_task(self.websocket.close())
 
     def is_closing(self) -> bool:
-        return self.websocket.state == State.CLOSING
+        return self.websocket.state in (State.CLOSING, State.CLOSED)
 
     def get_extra_info(self, name: str, default=None):
         return self.info_handlers.get(name, lambda _: default)(self.websocket)
