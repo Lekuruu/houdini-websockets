@@ -59,7 +59,10 @@ class HoudiniWebsockets(IPlugin):
             self.handler,
             self.host,
             self.port,
-            ssl=self.ssl_context
+            ssl=self.ssl_context,
+            ping_interval=30,  # Send ping every 30 seconds
+            ping_timeout=60,   # Wait 60 seconds for pong
+            close_timeout=10   # Wait 10 seconds when closing
         )
 
         async with server:
