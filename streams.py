@@ -16,6 +16,7 @@ class WebsocketWriter:
 
     def write(self, data: bytes) -> None:
         self.stack += data
+        asyncio.create_task(self.drain())
 
     async def drain(self) -> None:
         if not self.stack:
