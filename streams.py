@@ -1,5 +1,5 @@
 
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 from websockets import WebSocketClientProtocol
 from websockets.protocol import State
 from .utils import resolve_ip_address
@@ -21,8 +21,16 @@ class WebsocketWriter:
         if not self.stack:
             return
 
-        await self.websocket.send(self.stack)
-        self.stack = b''
+        if self.websocket.state in (State.CLOSING, State.CLOSED):
+            self.stack = b''
+            return
+
+        try:
+            await self.websocket.send(self.stack)
+            self.stack = b''
+        except (ConnectionClosed, WebSocketException):
+            # Connection is closed, clear the stack but don't raise
+            self.stack = b''
 
     def close(self) -> None:
         asyncio.create_task(self.websocket.close())
@@ -41,6 +49,10 @@ class WebsocketReader:
 
     async def readuntil(self, separator: bytes) -> bytes:
         while True:
+            # Check if connection is closed first
+            if self.websocket.state in (State.CLOSING, State.CLOSED):
+                raise ConnectionResetError()
+
             if separator in self.stack:
                 index = self.stack.index(separator)
                 data = self.stack[:index + len(separator)]
@@ -49,6 +61,11 @@ class WebsocketReader:
 
             try:
                 chunk = await self.websocket.recv()
+
+                # Ensure chunk is in bytes
+                if isinstance(chunk, str):
+                    chunk = chunk.encode('utf-8')
+
                 self.stack += chunk
-            except ConnectionClosed:
+            except (ConnectionClosed, WebSocketException):
                 raise ConnectionResetError()

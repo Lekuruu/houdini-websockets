@@ -73,4 +73,23 @@ class HoudiniWebsockets(IPlugin):
         reader = WebsocketReader(websocket)
         writer = WebsocketWriter(websocket)
         penguin = Penguin(self.server, reader, writer)
-        await penguin.run()
+        penguin_task = asyncio.create_task(penguin.run())
+
+        try:
+            # Wait for either the penguin task to 
+            # complete or the websocket to close
+            await penguin_task
+        except Exception as e:
+            self.logger.error(f"Error in websocket handler: {e}")
+        finally:
+            # Ensure the websocket is properly closed
+            if not websocket.closed:
+                await websocket.close()
+            
+            # Cancel the penguin task if it's still running
+            if not penguin_task.done():
+                penguin_task.cancel()
+                try:
+                    await penguin_task
+                except asyncio.CancelledError:
+                    pass
