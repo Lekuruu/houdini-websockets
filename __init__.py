@@ -1,8 +1,7 @@
 
 from .streams import WebsocketReader, WebsocketWriter
 
-from websockets import WebSocketClientProtocol
-from websockets.server import serve
+from websockets.asyncio.server import ServerConnection, serve
 from houdini.plugins import IPlugin
 from houdini.penguin import Penguin
 from typing import Optional
@@ -69,7 +68,7 @@ class HoudiniWebsockets(IPlugin):
             self.logger.info(f'Websocket server listening on {self.host}:{self.port}')
             await asyncio.Future()
 
-    async def handler(self, websocket: WebSocketClientProtocol, path: str) -> None:
+    async def handler(self, websocket: ServerConnection) -> None:
         reader = WebsocketReader(websocket)
         writer = WebsocketWriter(websocket)
         penguin = Penguin(self.server, reader, writer)
@@ -83,7 +82,7 @@ class HoudiniWebsockets(IPlugin):
             self.logger.error(f"Error in websocket handler: {e}")
         finally:
             # Ensure the websocket is properly closed
-            if not websocket.closed:
+            if websocket.close_code is None:
                 await websocket.close()
             
             # Cancel the penguin task if it's still running

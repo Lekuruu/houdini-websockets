@@ -1,8 +1,8 @@
 
-from websockets import WebSocketServerProtocol
+from websockets.asyncio.server import ServerConnection
 
-def resolve_ip_address(websocket: WebSocketServerProtocol) -> str:
-    headers = websocket.request_headers
+def resolve_ip_address(websocket: ServerConnection) -> str:
+    headers = websocket.request.headers
 
     if 'CF-Connecting-IP' in headers:
         return headers['CF-Connecting-IP'].strip()
