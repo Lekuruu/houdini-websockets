@@ -1,6 +1,7 @@
 
 from websockets.exceptions import ConnectionClosed, WebSocketException
 from websockets.asyncio.server import ServerConnection
+from contextlib import suppress
 from .utils import resolve_ip_address
 
 import asyncio
@@ -63,17 +64,14 @@ class WebsocketWriter:
         if self.drain_task and not self.drain_task.done():
             # Cancel any pending drain task
             self.drain_task.cancel()
-            try:
-                await self.drain_task
-            except asyncio.CancelledError:
-                pass
 
-        try:
+            with suppress(asyncio.CancelledError):
+                await self.drain_task
+
+        with suppress(ConnectionClosed, WebSocketException):
             if self.websocket.close_code is None:
                 # Close the websocket, if not already closed
                 await self.websocket.close()
-        except (ConnectionClosed, WebSocketException):
-            pass
 
 class WebsocketReader:
     """Replacement for the `StreamReader` class in asyncio"""
@@ -89,7 +87,7 @@ class WebsocketReader:
                 (self.writer.closing if self.writer else False) or
                 self.websocket.close_code is not None
             )
-            
+
             if is_closing:
                 raise ConnectionResetError()
 
