@@ -69,8 +69,8 @@ class HoudiniWebsockets(IPlugin):
             await asyncio.Future()
 
     async def handler(self, websocket: ServerConnection) -> None:
-        reader = WebsocketReader(websocket)
         writer = WebsocketWriter(websocket)
+        reader = WebsocketReader(websocket, writer)
         penguin = Penguin(self.server, reader, writer)
         penguin_task = asyncio.create_task(penguin.run())
 

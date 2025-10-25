@@ -12,17 +12,26 @@ class WebsocketWriter:
     def __init__(self, websocket: ServerConnection):
         self.websocket = websocket
         self.stack = b''
+        self.closing = False
+        self.close_task = None
+        self.drain_task = None
 
     def write(self, data: bytes) -> None:
+        if self.closing:
+            return
+
         self.stack += data
-        asyncio.create_task(self.drain())
+
+        if self.drain_task is None or self.drain_task.done():
+            # Only create a new drain task if one isn't already running
+            self.drain_task = asyncio.create_task(self.drain())
 
     async def drain(self) -> None:
         if not self.stack:
             return
 
-        # Check if connection is closed
-        if self.websocket.close_code is not None:
+        # Check if connection is closed or closing
+        if self.closing or self.websocket.close_code is not None:
             self.stack = b''
             return
 
@@ -32,26 +41,56 @@ class WebsocketWriter:
         except (ConnectionClosed, WebSocketException):
             # Connection is closed, clear the stack but don't raise
             self.stack = b''
+            self.closing = True
 
     def close(self) -> None:
-        asyncio.create_task(self.websocket.close())
+        if self.closing:
+            return
+
+        self.closing = True
+
+        if self.close_task is None or self.close_task.done():
+            # Only create a close task if one doesn't exist
+            self.close_task = asyncio.create_task(self.perform_close())
 
     def is_closing(self) -> bool:
-        return self.websocket.close_code is not None
+        return self.closing or self.websocket.close_code is not None
 
     def get_extra_info(self, name: str, default=None):
         return self.info_handlers.get(name, lambda _: default)(self.websocket)
 
+    async def perform_close(self) -> None:
+        if self.drain_task and not self.drain_task.done():
+            # Cancel any pending drain task
+            self.drain_task.cancel()
+            try:
+                await self.drain_task
+            except asyncio.CancelledError:
+                pass
+
+        try:
+            if self.websocket.close_code is None:
+                # Close the websocket, if not already closed
+                await self.websocket.close()
+        except (ConnectionClosed, WebSocketException):
+            pass
+
 class WebsocketReader:
     """Replacement for the `StreamReader` class in asyncio"""
-    def __init__(self, websocket: ServerConnection):
+    def __init__(self, websocket: ServerConnection, writer: "WebsocketWriter" = None) -> None:
         self.websocket = websocket
+        self.writer = writer
         self.stack = b''
 
     async def readuntil(self, separator: bytes) -> bytes:
         while True:
             # Check if connection is closed first
-            if self.websocket.close_code is not None:
+            is_closing = (
+                (self.writer.closing if self.writer else False) or
+                self.websocket.close_code is not None
+            )
+            
+            if is_closing:
                 raise ConnectionResetError()
 
             if separator in self.stack:
@@ -69,4 +108,7 @@ class WebsocketReader:
 
                 self.stack += chunk
             except (ConnectionClosed, WebSocketException):
+                if self.writer:
+                    # Mark writer as closing so it knows the connection is dead
+                    self.writer.closing = True
                 raise ConnectionResetError()
